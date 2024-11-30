@@ -1,8 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { HotTable } from '@handsontable/react';
 import 'handsontable/dist/handsontable.full.css';
-import { FaRegEye, FaRegEyeSlash, FaSave, FaPlay, FaDropbox, FaBurn } from 'react-icons/fa'; // Для иконок
-
+import { FaRegEye, FaRegEyeSlash, FaSave, FaPlay, FaDropbox } from 'react-icons/fa';
 
 const TableEditor = () => {
   const [tables, setTables] = useState([]);
@@ -11,215 +10,220 @@ const TableEditor = () => {
   const [newTableName, setNewTableName] = useState('');
   const [newCol, setCol] = useState('');
   const [newRow, setRow] = useState('');
-  const [showFormulas, setShowFormulas] = useState(false); // Состояние для отображения формул
+  const [showFormulas, setShowFormulas] = useState(false);
 
   const hotTableRef = useRef(null);
 
-  // Fetch list of tables
+  // Fetch the list of tables
+  const fetchTables = async () => {
+    try {
+      const response = await fetch('http://localhost:3001/tables');
+      const data = await response.json();
+      setTables(data);
+    } catch (err) {
+      console.error('Error fetching tables:', err);
+    }
+  };
+
   useEffect(() => {
-    fetch('http://localhost:3001/tables')
-      .then((res) => res.json())
-      .then(setTables)
-      .catch(console.error);
+    fetchTables();
   }, []);
 
-  // Fetch data for selected table
+  // Fetch data for the selected table
   useEffect(() => {
+    const fetchTableData = async () => {
+      try {
+        const response = await fetch(`http://localhost:3001/table/${selectedTableId}`);
+        const data = await response.json();
+        setShowFormulas(true);
+        setTableData(data);
+      } catch (err) {
+        console.error('Error fetching table data:', err);
+      }
+    };
+
     if (selectedTableId) {
-      fetch(`http://localhost:3001/table/${selectedTableId}`)
-        .then((res) => res.json())
-        .then((data) => {
-          setShowFormulas(true); // После получения данных показываем формулы
-          setTableData(data);
-        })
-        .catch(console.error);
+      fetchTableData();
     }
   }, [selectedTableId]);
 
-  const saveTableData = () => {
-    if (selectedTableId && hotTableRef.current) {
+  const saveTableData = async () => {
+    if (!selectedTableId || !hotTableRef.current) {
+      console.error('Unable to save: No table selected or Handsontable not initialized.');
+      return;
+    }
+
+    try {
       const data = hotTableRef.current.hotInstance.getData();
-      fetch(`http://localhost:3001/table/${selectedTableId}`, {
+      const response = await fetch(`http://localhost:3001/table/${selectedTableId}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ data }),
-      })
-        .then((res) => {
-          if (!res.ok) {
-            throw new Error('Failed to save table data');
-          }
-        })
-        .catch(console.error);
-    } else {
-      console.error('Unable to save: No table selected or Handsontable not initialized.');
+      });
+      if (!response.ok) throw new Error('Failed to save table data');
+    } catch (err) {
+      console.error('Error saving table data:', err);
     }
   };
 
-  const createTable = () => {
+  const createTable = async () => {
     if (!newTableName.trim()) return;
-    
 
-    fetch('http://localhost:3001/tables', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: newTableName, col: newCol || 10, row: newRow || 10}),
-    })
-      .then((res) => res.json())
-      .then((newTable) => {
-        setTables((prev) => [...prev, newTable]);
-        setNewTableName('');
-        setCol('')
-        setRow('')
-      })
-      .catch(console.error);
-  };
-
-  const deleteTable = (id) => {
-    
-    fetch('http://localhost:3001/tablesdel', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: id}),
-    })
-      .then((res) => res.json())
-      .then(() => {
-        setTables((prev) => [...prev]);
-        setNewTableName('');
-        setCol('')
-        setRow('')
-        setSelectedTableId(null)
-      })
-      .catch(console.error);
-  };
-
-  // Функция для применения формул
-  const applyFormulas = () => {
-    if (hotTableRef.current) {
-      const data = hotTableRef.current.hotInstance.getData();
-      
-      // Отправляем данные на сервер для применения формул
-      fetch('http://localhost:3001/api/apply-formulas', {
+    try {
+      const response = await fetch('http://localhost:3001/tables', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ data }), // Отправляем данные таблицы
-      })
-        .then((response) => response.json())
-        .then((updatedData) => {
-          setShowFormulas(true);
-          setTableData(updatedData); // Обновляем таблицу с результатами формул
-        })
-        .catch((err) => {
-          console.error('Error applying formulas:', err);
-        });
+        body: JSON.stringify({ name: newTableName, col: newCol || 10, row: newRow || 10 }),
+      });
+      const newTable = await response.json();
+      await fetchTables(); // Refresh table list
+      setNewTableName('');
+      setCol('');
+      setRow('');
+    } catch (err) {
+      console.error('Error creating table:', err);
     }
   };
 
-  // Функция для показа формул
-  const toggleShowFormulas = () => {
-    if (hotTableRef.current) {
-      const dataa = hotTableRef.current.hotInstance.getData();
-      const data = {
-        id: selectedTableId,
-        show: showFormulas,
-        data: dataa,
-      };
-      
-      fetch(`http://localhost:3001/api/not-apply-formulas`, {
+  const deleteTable = async (id) => {
+    try {
+      const response = await fetch('http://localhost:3001/tablesdel', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ data }), // Отправляем данные таблицы
-      })
-        .then((response) => response.json())
-        .then((updatedData) => {
-          setShowFormulas((prev) => !prev); // Переключаем состояние отображения формул
-          setTableData(updatedData); // Обновляем таблицу
-        })
-        .catch((err) => {
-          console.error('Error applying formulas:', err);
+        body: JSON.stringify({ name: id }),
+      });
+      if (!response.ok) throw new Error('Failed to delete table');
+      await fetchTables(); // Refresh table list after deletion
+      if (selectedTableId === id) {
+        setSelectedTableId(null); // Close the table if it was active
+        setTableData([]); // Clear the table data
+      }
+    } catch (err) {
+      console.error('Error deleting table:', err);
+    }
+  };
+
+  const applyFormulas = async () => {
+    if (hotTableRef.current) {
+      try {
+        const data = hotTableRef.current.hotInstance.getData();
+        const response = await fetch('http://localhost:3001/api/apply-formulas', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ data }),
         });
+        const updatedData = await response.json();
+        setShowFormulas(true);
+        setTableData(updatedData);
+      } catch (err) {
+        console.error('Error applying formulas:', err);
+      }
+    }
+  };
+
+  const toggleShowFormulas = async () => {
+    if (hotTableRef.current) {
+      try {
+        const data = hotTableRef.current.hotInstance.getData();
+        const payload = {
+          id: selectedTableId,
+          show: !showFormulas,
+          data,
+        };
+
+        const response = await fetch('http://localhost:3001/api/not-apply-formulas', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        const updatedData = await response.json();
+        setShowFormulas((prev) => !prev);
+        setTableData(updatedData);
+      } catch (err) {
+        console.error('Error toggling formulas:', err);
+      }
     }
   };
 
   const processedData = tableData.map((row) =>
-    row.map((cell) => {
-      if (showFormulas && typeof cell === 'string' && cell.startsWith('=')) {
-        return cell; // Показываем формулу
-      }
-      return cell; // Показываем вычисленное значение или другие данные
-    })
+    row.map((cell) => (showFormulas && typeof cell === 'string' && cell.startsWith('=') ? cell : cell))
   );
 
   return (
     <div>
-      <h1 className='Tittle'>Редактор таблиц</h1>
-      <div className='container'>
-      <div>
-        <input
-          type="text"
-          placeholder="Название таблицы"
-          required=''
-          value={newTableName}
-          onChange={(e) => setNewTableName(e.target.value)}
-        />
-        <input
-          type="number"
-          placeholder="Количество строк"
-          required=''
-          value={newRow}
-          onChange={(e) => setRow(e.target.value)}
-        />
-        <input
-          type="number"
-          placeholder="Количество столбцов"
-          required=''
-          value={newCol}
-          onChange={(e) => setCol(e.target.value)}
-        />
-        <button onClick={createTable}>Создать таблицу</button>
-      </div>
-      <h2>Доступные таблицы</h2>
-      <ul>
-        {tables.map((table) => (
-          <li key={table.id}>
-            <button
-              onClick={() => setSelectedTableId(table.id)}
-              style={{ fontWeight: selectedTableId === table.id ? 'bold' : 'normal' }}
-            >
-              {table.name}
-            </button>
-            <button
-              onClick={() => deleteTable(table.id)}
-            ><FaDropbox />
-              Удалить
-            </button>
-          </li>
-        ))}
-      </ul>
-      
-      {selectedTableId && (
+      <h1 className="Tittle">Редактор таблиц</h1>
+      <div className="container">
         <div>
-          <div className='Buttons'>
-            <button onClick={saveTableData}><FaSave /> Save Table</button>
-            <button onClick={applyFormulas}><FaPlay /> Apply Formulas</button> {/* Кнопка применения формул */}
-            <button onClick={toggleShowFormulas}>
-              {showFormulas ? <><FaRegEyeSlash /> Hide Formulas</> : <><FaRegEye /> Show Formulas</>}
-            </button> {/* Кнопка для показа/скрытия формул */}
-          </div>
-          
-          <h2>Table {selectedTableId}</h2>
-          <HotTable
-            ref={hotTableRef}
-            data={processedData}
-            colHeaders
-            rowHeaders
-            width="100%"
-            height="500px"
-            licenseKey="non-commercial-and-evaluation"
+          <input
+            type="text"
+            placeholder="Название таблицы"
+            value={newTableName}
+            onChange={(e) => setNewTableName(e.target.value)}
           />
-          
+          <input
+            type="number"
+            placeholder="Количество строк"
+            value={newRow}
+            onChange={(e) => setRow(e.target.value)}
+          />
+          <input
+            type="number"
+            placeholder="Количество столбцов"
+            value={newCol}
+            onChange={(e) => setCol(e.target.value)}
+          />
+          <button onClick={createTable}>Создать таблицу</button>
         </div>
-      )}
-    </div>
+        <h2>Доступные таблицы</h2>
+        <ul>
+          {tables.map((table) => (
+            <li key={table.id}>
+              <button
+                onClick={() => setSelectedTableId(table.id)}
+                style={{ fontWeight: selectedTableId === table.id ? 'bold' : 'normal' }}
+              >
+                {table.name}
+              </button>
+              <button onClick={() => deleteTable(table.id)}>
+                <FaDropbox /> Удалить
+              </button>
+            </li>
+          ))}
+        </ul>
+        {selectedTableId && (
+          <div>
+            <div className="Buttons">
+              <button onClick={saveTableData}>
+                <FaSave /> Сохранить таблицу
+              </button>
+              <button onClick={applyFormulas}>
+                <FaPlay /> Применить формулы
+              </button>
+              <button onClick={toggleShowFormulas}>
+                {showFormulas ? (
+                  <>
+                    <FaRegEyeSlash /> Скрыть формулы
+                  </>
+                ) : (
+                  <>
+                    <FaRegEye /> Показать формулы
+                  </>
+                )}
+              </button>
+            </div>
+            <h2>Таблица {selectedTableId}</h2>
+            <HotTable
+              ref={hotTableRef}
+              data={processedData}
+              colHeaders
+              rowHeaders
+              width="100%"
+              height="500px"
+              licenseKey="non-commercial-and-evaluation"
+            />
+          </div>
+        )}
+      </div>
     </div>
   );
 };
