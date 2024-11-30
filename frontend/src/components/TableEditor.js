@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { HotTable } from '@handsontable/react';
 import 'handsontable/dist/handsontable.full.css';
-import { FaRegEye, FaRegEyeSlash, FaSave, FaPlay, FaDropbox } from 'react-icons/fa';
+import { FaRegEye, FaRegEyeSlash, FaSave, FaDropbox } from 'react-icons/fa';
 
 const TableEditor = () => {
   const [tables, setTables] = useState([]);
@@ -103,14 +103,15 @@ const TableEditor = () => {
     }
   };
 
-  const applyFormulas = async () => {
+  const applyFormulas = async (changedData) => {
+    // Function to apply formulas to the data
     if (hotTableRef.current) {
       try {
         const data = hotTableRef.current.hotInstance.getData();
         const response = await fetch('http://localhost:3001/api/apply-formulas', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ data }),
+          body: JSON.stringify({ data, changedData }),
         });
         const updatedData = await response.json();
         setShowFormulas(true);
@@ -148,6 +149,16 @@ const TableEditor = () => {
   const processedData = tableData.map((row) =>
     row.map((cell) => (showFormulas && typeof cell === 'string' && cell.startsWith('=') ? cell : cell))
   );
+
+  // This event will be triggered every time a change is made in the table
+  const handleAfterChange = (changes) => {
+    if (changes) {
+      // Automatically apply formulas after change
+      const [row, col, oldValue, newValue] = changes[0]; // Get the changed cell's info
+      const changedData = { row, col, oldValue, newValue };
+      applyFormulas(changedData); // Pass changed data for formula recalculation
+    }
+  };
 
   return (
     <div>
@@ -196,9 +207,6 @@ const TableEditor = () => {
               <button onClick={saveTableData}>
                 <FaSave /> Сохранить таблицу
               </button>
-              <button onClick={applyFormulas}>
-                <FaPlay /> Применить формулы
-              </button>
               <button onClick={toggleShowFormulas}>
                 {showFormulas ? (
                   <>
@@ -220,6 +228,7 @@ const TableEditor = () => {
               width="100%"
               height="500px"
               licenseKey="non-commercial-and-evaluation"
+              afterChange={handleAfterChange} // Hook for changes
             />
           </div>
         )}

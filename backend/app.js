@@ -4,6 +4,7 @@ const cors = require('cors');
 const db = require('./db/db'); // Подключение модуля для работы с PostgreSQL
 const { Pool } = require('pg');
 const math = require('mathjs'); // Подключение mathjs для вычислений
+const { exec } = require('child_process');
 
 const pool = new Pool({
   user: 'postgres',
@@ -34,8 +35,29 @@ app.use(bodyParser.json());
 // Функция проверки и обработки формулы
 const isFormula = (value) => typeof value === 'string' && value.startsWith('=');
 
+function runCppCode(expression) {
+  return new Promise((resolve, reject) => {
+    // Выполняем C++ программу с переданным выражением как аргумент
+    exec(`C:/Users/Лео/Desktop/table-editor-project/backend/calculator.exe "${expression}"`, (error, stdout, stderr) => {
+      if (error) {
+        console.error("Error executing C++ program:", error.message);
+        reject(`Error executing C++ program: ${error.message}`);
+        return;
+      }
+      if (stderr) {
+        console.error("C++ program stderr:", stderr);
+        reject(`C++ program stderr: ${stderr}`);
+        return;
+      }
+
+      // Возвращаем результат, очищенный от лишних пробелов и символов
+      resolve(stdout.trim());
+    });
+  });
+}
+
 // Новая функция для вычисления формул с поддержкой ссылок
-const evaluateFormula = (formula, tableData) => {
+const evaluateFormula = async (formula, tableData) => {
   let cleanedFormula = formula.substring(1); // Убираем '=' в начале
 
   // Используем регулярное выражение для нахождения всех ячеек, например "A1", "B2"
@@ -51,8 +73,7 @@ const evaluateFormula = (formula, tableData) => {
     let cellValue = tableData[row] && tableData[row][colIndex];
 
     // Если значение ячейки пустое, считаем его 0 для вычислений
-    console.log(cellValue)
-    if (cellValue === undefined || cellValue === null) {
+    if (cellValue === undefined || cellValue === null || cellValue === '') {
       cellValue = 0;
     }
 
@@ -61,36 +82,43 @@ const evaluateFormula = (formula, tableData) => {
   }
 
   try {
-    // Вычисляем формулу
-    return math.evaluate(cleanedFormula);
+    // Вызываем C++ программу для вычисления выражения
+    const result = await runCppCode(cleanedFormula);
+    return result;
   } catch (err) {
     throw new Error(`Error evaluating formula: ${err.message}`);
   }
 };
 
-// Endpoint для получения данных таблицы с вычисленными значениями
-app.post('/api/apply-formulas', (req, res) => {
+app.post('/api/apply-formulas', async (req, res) => {
   const { data } = req.body;
 
   try {
     // Применяем формулы ко всем ячейкам
-    const updatedData = data.map((row, rowIndex) =>
-      row.map((cell, colIndex) => {
-        // Если ячейка содержит формулу
-        if (typeof cell === 'string' && cell.startsWith('=')) {
-          try {
-            // Вычисляем результат формулы
-            return evaluateFormula(cell, data);
-          } catch (err) {
-            console.error(`Error evaluating formula: ${err.message}`);
-            return 'ERROR'; // Если ошибка в вычислении формулы, возвращаем "ERROR"
-          }
-        }
-        // Если ячейка не содержит формулы, оставляем её без изменений
-        return cell;
+    const updatedData = await Promise.all(
+      data.map(async (row, rowIndex) => {
+        return await Promise.all(
+          row.map(async (cell, colIndex) => {
+            // Если ячейка содержит формулу
+            if (typeof cell === 'string' && cell.startsWith('=')) {
+              try {
+                // Вычисляем результат формулы
+                const val = await evaluateFormula(cell, data);
+                console.log(val);  // Выводим результат вычисления формулы
+                return val; // Возвращаем результат вычисления формулы
+              } catch (err) {
+                console.error(`Error evaluating formula: ${err.message}`);
+                return 'ERROR'; // Если ошибка в вычислении формулы, возвращаем "ERROR"
+              }
+            }
+            // Если ячейка не содержит формулы, оставляем её без изменений
+            return cell;
+          })
+        );
       })
     );
 
+    // Отправляем обновленные данные обратно
     res.json(updatedData);
   } catch (err) {
     console.error('Error applying formulas:', err);
@@ -98,9 +126,10 @@ app.post('/api/apply-formulas', (req, res) => {
   }
 });
 
+
 // Endpoint для получения данных таблицы с вычисленными значениями
 app.post('/api/not-apply-formulas', async (req, res) => {
-  const { id, show, data } = req.body.data;
+  const { id, show, data } = req.body;
   try {
     // Применяем формулы ко всем ячейкам
     const result = await pool.query(
@@ -115,7 +144,7 @@ app.post('/api/not-apply-formulas', async (req, res) => {
     // Преобразуем в формат Handsontable (массив массивов)
     const dataa = data;
     const context = {}; // Контекст для сохранения переменных и значений
-
+    
     result.rows.forEach(({ row, col, value }) => {
       // Если ячейка содержит формулу, вычисляем её значение
       if (isFormula(value) && show) {
@@ -126,6 +155,7 @@ app.post('/api/not-apply-formulas', async (req, res) => {
         context[cellKey] = evaluatedValue; // Сохраняем вычисленное значение в контекст
       }
     });
+    
     res.json(dataa);
   } catch (err) {
     console.error('Error applying formulas:', err);
