@@ -1,0 +1,130 @@
+@font-face {
+  font-family: Mont;
+  src: url('/font/Montserrat-Regular.ttf');
+}
+
+* {
+  font-family: Mont;
+}
+
+/* General container styles */
+.container {
+    width: 80%;
+    margin: 0 auto;
+    padding: 20px;
+    font-family: Arial, sans-serif;
+  }
+  
+  /* Header styling */
+  h1 {
+    text-align: center;
+    font-size: 2rem;
+    color: #333;
+    font-family: Mont;
+  }
+  
+  h2 {
+    font-size: 1.5rem;
+    color: #444;
+    margin-bottom: 20px;
+  }
+  
+  /* Table styles */
+  .hot-table {
+    border: 1px solid #ccc;
+    margin-top: 20px;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  
+  /* Form inputs and buttons */
+  input[type="text"], input[type='number'] {
+    padding: 8px;
+    margin-right: 10px;
+    font-size: 1rem;
+    border-radius: 4px;
+    border: 1px solid #ccc;
+    width: 200px;
+  }
+  
+  button {
+    padding: 10px 20px;
+    font-size: 1rem;
+    border-radius: 4px;
+    border: none;
+    cursor: pointer;
+    background-color: #4CAF50;
+    color: white;
+    margin-top: 10px;
+    transition: background-color 0.3s ease;
+  }
+  
+  button:hover {
+    background-color: #45a049;
+  }
+  
+  button:disabled {
+    background-color: #ccc;
+    cursor: not-allowed;
+  }
+  
+  /* Button for showing/hiding formulas */
+  .toggle-btn {
+    background-color: #2196F3;
+  }
+  
+  .toggle-btn:hover {
+    background-color: #1976D2;
+  }
+  
+  .toggle-btn span {
+    margin-left: 8px;
+  }
+  
+  /* Table name input */
+  input[type="text"] {
+    margin-bottom: 10px;
+  }
+  
+  /* List of tables */
+  ul {
+    list-style: none;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+  }
+  
+  li {
+    margin-bottom: 10px;
+    display: flex;
+    gap: 1em;
+  }
+  
+  li button {
+    display: block;
+    width: 100%;
+    padding: 12px;
+    text-align: left;
+    font-size: 1rem;
+    background-color: #f4f4f4;
+    border: 1px solid #ddd;
+    cursor: pointer;
+    color: #444;
+  }
+  
+  li button:hover {
+    background-color: #ddd;
+  }
+  
+  .handsontable {
+    height: fit-content;
+  }
+
+  .Buttons {
+    display: flex;
+    gap: 1em;
+  }
+  .Buttons button {
+    display: block;
+  }
