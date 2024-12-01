@@ -122,29 +122,6 @@ const TableEditor = () => {
     }
   };
 
-  const toggleShowFormulas = async () => {
-    if (hotTableRef.current) {
-      try {
-        const data = hotTableRef.current.hotInstance.getData();
-        const payload = {
-          id: selectedTableId,
-          show: !showFormulas,
-          data,
-        };
-
-        const response = await fetch('http://localhost:3001/api/not-apply-formulas', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
-        });
-        const updatedData = await response.json();
-        setShowFormulas((prev) => !prev);
-        setTableData(updatedData);
-      } catch (err) {
-        console.error('Error toggling formulas:', err);
-      }
-    }
-  };
 
   const processedData = tableData.map((row) =>
     row.map((cell) => (showFormulas && typeof cell === 'string' && cell.startsWith('=') ? cell : cell))
@@ -206,17 +183,6 @@ const TableEditor = () => {
             <div className="Buttons">
               <button onClick={saveTableData}>
                 <FaSave /> Сохранить таблицу
-              </button>
-              <button onClick={toggleShowFormulas}>
-                {showFormulas ? (
-                  <>
-                    <FaRegEyeSlash /> Скрыть формулы
-                  </>
-                ) : (
-                  <>
-                    <FaRegEye /> Показать формулы
-                  </>
-                )}
               </button>
             </div>
             <h2>Таблица {selectedTableId}</h2>

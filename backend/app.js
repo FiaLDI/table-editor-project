@@ -84,7 +84,7 @@ const evaluateFormula = async (formula, tableData) => {
   try {
     // Вызываем C++ программу для вычисления выражения
     const result = await runCppCode(cleanedFormula);
-    return result;
+    return `${cleanedFormula}==${result}`;
   } catch (err) {
     throw new Error(`Error evaluating formula: ${err.message}`);
   }
@@ -126,42 +126,6 @@ app.post('/api/apply-formulas', async (req, res) => {
   }
 });
 
-
-// Endpoint для получения данных таблицы с вычисленными значениями
-app.post('/api/not-apply-formulas', async (req, res) => {
-  const { id, show, data } = req.body;
-  try {
-    // Применяем формулы ко всем ячейкам
-    const result = await pool.query(
-      `
-      SELECT row, col, value
-      FROM table_data
-      WHERE table_id = $1
-    `,
-      [id]
-    );
-
-    // Преобразуем в формат Handsontable (массив массивов)
-    const dataa = data;
-    const context = {}; // Контекст для сохранения переменных и значений
-    
-    result.rows.forEach(({ row, col, value }) => {
-      // Если ячейка содержит формулу, вычисляем её значение
-      if (isFormula(value) && show) {
-        
-        const evaluatedValue = value;
-        dataa[row][col] = evaluatedValue;
-        const cellKey = `R${row}C${col}`;
-        context[cellKey] = evaluatedValue; // Сохраняем вычисленное значение в контекст
-      }
-    });
-    
-    res.json(dataa);
-  } catch (err) {
-    console.error('Error applying formulas:', err);
-    res.status(500).json({ error: err.message });
-  }
-});
 
 // Получить список таблиц
 app.get('/tables', async (req, res) => {
